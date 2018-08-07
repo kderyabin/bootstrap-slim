@@ -1,0 +1,45 @@
+{
+    "name": "mdcs/slim-bootstrap",
+    "description": "A tiny php library for bootstrapping a Slim based application.",
+    "version" : "1.0.0",
+    "type": "library",
+    "keywords": ["php", "Slim 3"],
+    "config": {
+        "bin-dir": "bin",
+        "vendor-dir": "vendor"
+    },
+    "autoload": {
+        "psr-4": {
+            "MDCS\\Slim\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MDCS\\Slim\\Tests\\": "tests"
+        }
+    },
+    "require": {
+        "psr/container": "^1.0",
+        "psr/http-message": "^1.0"
+    },
+    "require-dev": {
+        "slim/slim": "~3.9.0",
+        "squizlabs/php_codesniffer": "2.9.1",
+        "phpunit/phpunit": "^6.1"
+    },
+    "scripts": {
+        "test": [
+            "@phpcs",
+            "@phpunit"
+        ],
+        "phpcs": [
+            "env ./bin/phpcs --colors --encoding=utf-8 --standard=PSR2 --extensions=php --runtime-set ignore_warnings_on_exit 1 --ignore=vendor/ ./src/"
+        ],
+        "phpcsfix" : [
+            "env ./bin/phpcbf --encoding=utf-8 --standard=PSR2 --extensions=php -n --runtime-set ignore_warnings_on_exit 1 --ignore=vendor/ ./src/"
+        ],
+        "phpunit": [
+            "env ./bin/phpunit -c phpunit.xml"
+        ]
+    }
+}
