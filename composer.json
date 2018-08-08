@@ -40,6 +40,9 @@
         ],
         "phpunit": [
             "env ./bin/phpunit -c phpunit.xml"
+        ],
+        "phpunit-cover": [
+            "env ./bin/phpunit -c phpunit-cover.xml"
         ]
     }
 }
