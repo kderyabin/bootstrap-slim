@@ -4,6 +4,15 @@
     "version" : "1.0.0",
     "type": "library",
     "keywords": ["php", "Slim 3"],
+    "repositories": [
+        {
+            "type": "composer",
+            "url": "https://artifactory.packages.install-os.multis.p.fti.net/api/composer/ext_composer"
+        },
+        {
+            "packagist": false
+        }
+    ],
     "config": {
         "bin-dir": "bin",
         "vendor-dir": "vendor"
