@@ -7,6 +7,7 @@
  * in accordance with the terms of the agreement you entered into.
  * Unauthorized copying of this file, via any medium is strictly prohibited.
  */
+
 /**
  * Created on 2018-08-07
  */
@@ -35,6 +36,8 @@ class BootstrapTest extends TestCase
         $bootstrap = new Bootstrap(App::class, []);
         $this->assertInstanceOf(App::class, $bootstrap->getApp());
         $this->assertInstanceOf(ContainerInterface::class, $bootstrap->getAppContainer());
+        $this->assertInstanceOf(Bootstrap::class, $bootstrap->addDefaultRoutes());
+        $this->assertInstanceOf(Bootstrap::class, $bootstrap->addDefaultMiddlewares());
     }
 
     /**
@@ -52,12 +55,45 @@ class BootstrapTest extends TestCase
          */
         $app = $bootstrap->getApp();
         $request = static::getRequest();
-        $response = $app->process( $request, new Response());
+        $response = $app->process($request, new Response());
 
         $content = (string)$response->getBody();
 
         $this->assertContains(MockMiddleware::$contentBefore, $content);
         $this->assertContains(MockMiddleware::$contentAfter, $content);
+
+        $this->assertContains(MockRoutes::$content, $content);
+    }
+
+    /**
+     * Test Bootstrap initialization with callables Routes and Middleware.
+     * @throws \Exception
+     * @throws \Slim\Exception\MethodNotAllowedException
+     * @throws \Slim\Exception\NotFoundException
+     */
+    public function testInitWithCallables()
+    {
+        $bootstrap = new MockBootstrap(App::class);
+        $bootstrap
+            ->addMiddleware(
+                new MockMiddleware($bootstrap->getAppContainer())
+            )
+            ->addRoutes(
+                new MockRoutes()
+            );
+
+        /**
+         * @var App $app
+         */
+        $app = $bootstrap->getApp();
+        $request = static::getRequest();
+        $response = $app->process($request, new Response());
+
+        $content = (string)$response->getBody();
+
+        $this->assertContains(MockMiddleware::$contentBefore, $content);
+        $this->assertContains(MockMiddleware::$contentAfter, $content);
+
         $this->assertContains(MockRoutes::$content, $content);
     }
 

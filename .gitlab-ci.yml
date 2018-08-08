@@ -1,0 +1,64 @@
+image: "registry.gitlab.si.francetelecom.fr/mdcs/expapp/docker/ci/php-composer:7.0"
+variables:
+  mattermost_bot: "https://mattermost.pic.s1.p.fti.net/hooks/8pd9dbtpz3dz8nzwtwzypdmg5yi"
+
+.add_ssh_private_key_template:
+  before_script: &add_ssh_private_key
+    - eval $(ssh-agent -s)
+    - ssh-add <(echo -e "$SSH_PRIVATE_KEY")
+
+stages:
+  - build
+  - check
+
+build-app:
+  stage: build
+  tags:
+    - search
+  before_script: *add_ssh_private_key
+  script:
+    - composer install --no-dev -o
+  artifacts:
+    paths:
+      - src
+      - vendor
+    expire_in: '2 hours'
+
+build-app-dev:
+  stage: build
+  tags:
+    - search
+  before_script: *add_ssh_private_key
+  script:
+    - composer install
+  artifacts:
+    paths:
+      - src
+      - bin
+      - tests
+      - vendor
+    expire_in: '2 hours'
+  except:
+    - tags
+
+static-analysis:
+  stage: check
+  tags:
+    - search
+  script:
+    - composer phpcs
+  dependencies:
+    - build-app-dev
+  except:
+    - tags
+
+unit-tests:
+  stage: check
+  tags:
+    - search
+  script:
+    - composer phpunit
+  dependencies:
+    - build-app-dev
+  except:
+    - tags
