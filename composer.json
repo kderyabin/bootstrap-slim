@@ -1,7 +1,7 @@
 {
     "name": "mdcs/slim-bootstrap",
     "description": "A tiny php library for bootstrapping a Slim based application.",
-    "version" : "1.0.0",
+    "version" : "1.0.1",
     "type": "library",
     "keywords": ["php", "Slim 3"],
     "repositories": [
