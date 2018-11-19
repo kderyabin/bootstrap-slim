@@ -1,6 +1,6 @@
 image: "registry.gitlab.si.francetelecom.fr/mdcs/expapp/docker/ci/php-composer:7.0-xenial"
 variables:
-  ARTI_REPO: "https://artifactory.packages.install-os.multis.p.fti.net/sfy-mdcs_composer/eui/logger-php"
+  ARTI_REPO: "https://artifactory.packages.install-os.multis.p.fti.net/sfy-mdcs_composer/slim-bootstrap"
 
 .add_ssh_private_key_template:
   before_script: &add_ssh_private_key
