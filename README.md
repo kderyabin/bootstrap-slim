@@ -1,40 +1,63 @@
-# SLIM Bootstrap
+# Bootstrap SLIM  3
 
 This repository holds a library for bootstrapping SLIM 3 application.
 
-## Purpose 
+## Purpose
 
-- Centralize the application's configuration
+- Centralize the application's initialisation
 - Reuse existing configuration in unit tests
-- Easyly create a new customized configuration for unit tests
+- Create on the fly a new customized configuration for unit tests
 - Reduce usage of `require`/`include` statements.
 
 ## What's in the library
 
 | File | Description  |
 |:---|:--- |
-|`Middleware.php` | Abstract class for creating a middleware (implements __invoke() method).|
-|`Routes.php` | Abstract class for declaring routes (implements __invoke() method)| 
-|`Bootstrap.php` | Main class allowing to declare middleware(s) and routes and run the Slim application| 
+|`Middleware.php` | Abstract class for creating a middleware.|
+|`RouteDefintions.php` | Abstract class for declaring route's definitions| 
+|`Bootstrap.php` | Main class allowing to declare middleware and routes and run the Slim application| 
 
 ## Usage:
 
 ### How to implement
 
-Add this package to `require` section of the `composer.json`<br/>
-Create a Routes class by extending `MDCS\Slim\Routes` abstract class and declare your routes 
-in `__invoke()` method.<br/>
-Create your middleware class(es), if you use them, by extending  `MDCS\Slim\Middleware` abstract class
+Add this package to `require` section of the `composer.json`
+```
+composer require kod/bootstrap-slim
+```
+Create a class containing your routes by extending `Kod\BootstrapSlim\RouteDefintions` abstract class and declare your routes 
+in `__invoke($app)` method.
+```php
+<?php
+use Kod\BootstrapSlim\RouteDefinitions;
+
+class TestRouteDefinitions extends RouteDefinitions
+{
+    /**
+     * @param App $app  Slim App class instance
+     */
+    public function __invoke($app)
+    {
+        $app->get('/', function ($request, $response) {
+            $response->getBody()->write(MockRouteDefinitions::$content);
+
+            return $response;
+        });
+    }
+}
+```
+Create your middleware class(es), if you use them, by extending  `Kod\BootstrapSlim\Middleware` abstract class
 and implement your business logic in `__invoke()` method.<br/>
-Create a Bootstrap class by extending `MDCS\Slim\Bootstrap` class. <br/>
-Override `Bootstrap::addDefaultRoutes` and add your Routes class there.<br/>
-Override `Bootstrap::addDefaultMiddlewares` and add your middleware class(es) there.<br/>
+Create a Bootstrap class by extending `Kod\BootstrapSlim\Bootstrap` class. <br/>
+Override `Bootstrap::addAppRoutes` and add your Routes class there.<br/>
+Override `Bootstrap::addAppMiddleware` and add your middleware class(es) there.<br/>
 And finally instanciate your Bootstrap class somewhere in public `index.php` and run the application
 
 ### Bootstrap
 
 On `index.php` for handling public requests.
 ```php
+<?php
 use Slim\App;
 use MyProject\Bootstrap;
 
@@ -50,6 +73,7 @@ $conf = require('config.php');
 In unit tests. Let's say you want just to test your newly created routes (NewRoutes) without 
 all the application middlewares controlling the input and output. 
 ```php
+<?php
 use Slim\App;
 use MyProject\Bootstrap;
 use MyProject\NewRoutes;
@@ -66,7 +90,7 @@ class MyRouteTest extends TestCase
         ];
         $bootstrap = new Bootstrap(App::class, $conf);
         // add the routes class you wish to test
-        $bootstrap->addRoutes(NewRoutes::class);
+        $bootstrap->addRouteDefinitions(NewRoutes::class);
         // Generate a request with a right path and method for the route to test.
         // The request generation is out of the scope of this tutorial.
         $request = static::getRequest();
@@ -91,7 +115,7 @@ Boostrap can add only application middleware, nor route neither group middleware
 
 Sample: 
 ```php
-     public function addDefaultMiddlewares()
+     public function addAppMiddleware()
         {
             return $this->addMiddleware(
                 ValidateResponse::class,
@@ -104,9 +128,9 @@ Sample:
 #### Adding default application routes
 
 ```php
- public function addDefaultRoutes()
+ public function addAppRoutes()
      {
-         return $this->addRoutes(
+         return $this->addRouteDefinitions(
            HelpRoutes::class,
            MainRoutes::class
          );
@@ -119,13 +143,13 @@ Creating route(s). Sample. More on Slim routing can found at [Slim routing](http
 ```php
 namespace MyProject;
 
-use MDCS\Slim\Routes;
+use Kod\BootstrapSlim\RouteDefintions;
 use Slim\App;
 
 /**
  * MockRoutes sets the route and content generation.
  */
-class MyRoutes extends Routes
+class MyRoutes extends RouteDefintions
 {
     /**
      * @param App $app
@@ -148,7 +172,7 @@ Creating middleware. Sample. More on middleware can be found at [Slim middleware
 ```php
 namespace MyProject;
 
-use MDCS\Slim\Middleware;
+use Kod\BootstrapSlim\Middleware;
 use Slim\Http\Request;
 use Slim\Http\Response;
 

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+  bootstrap="bootstrap.php"
+  colors="true"
+  convertErrorsToExceptions="false"
+  convertNoticesToExceptions="false"
+  convertWarningsToExceptions="false">
+  <testsuites>
+    <testsuite name="BootstrapSlim Tests">
+      <directory suffix="Test.php">./src/</directory>
+    </testsuite>
+  </testsuites>
+  <filter>
+    <whitelist>
+      <directory suffix=".php">../src/</directory>
+    </whitelist>
+  </filter>
+  <logging>
+    <log
+      type="coverage-text"
+      target="php://stdout"
+      showOnlySummary="true"
+    />
+  </logging>
+</phpunit>

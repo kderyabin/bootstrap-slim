@@ -1,19 +1,14 @@
 <?php
 /**
- * Copyright (C)  2018 Orange
+ * Copyright (c) 2018 Konstantin Deryabin
  *
- * This software is confidential and proprietary information of Orange.
- * You shall not disclose such Confidential Information and shall use it only
- * in accordance with the terms of the agreement you entered into.
- * Unauthorized copying of this file, via any medium is strictly prohibited.
- */
-/**
- * Created on 2018-08-07
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
  */
 
-namespace MDCS\Slim\Tests\Mocks;
+namespace Kod\BootstrapSlim\Tests\Mocks;
 
-use MDCS\Slim\Middleware;
+use Kod\BootstrapSlim\Middleware;
 use Slim\Http\Request;
 use Slim\Http\Response;
 

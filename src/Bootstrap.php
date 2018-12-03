@@ -1,16 +1,15 @@
 <?php
 /**
- * Copyright (C)  2018 Orange
+ * Copyright (c) 2018 Konstantin Deryabin
  *
- * This software is confidential and proprietary information of Orange.
- * You shall not disclose such Confidential Information and shall use it only
- * in accordance with the terms of the agreement you entered into.
- * Unauthorized copying of this file, via any medium is strictly prohibited.
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
  */
 
-namespace MDCS\Slim;
+namespace Kod\BootstrapSlim;
 
 use Psr\Container\ContainerInterface;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Bootstrap
@@ -33,12 +32,12 @@ class Bootstrap
     }
 
     /**
-     * Attach application middlewares.
+     * Attach application middleware.
      * Override this method and declare your middlewares here.
      * The middleware definition order is important.
      * @return static
      */
-    public function addDefaultMiddlewares()
+    public function addAppMiddleware()
     {
         return $this;
     }
@@ -48,27 +47,31 @@ class Bootstrap
      * Override this method and declare your route(s) here.
      * @return static
      */
-    public function addDefaultRoutes()
+    public function addAppRoutes()
     {
         return $this;
     }
 
     /**
-     * Add app middleware(s).
+     * Add application middleware
      * The only requirement: $middleware can be a callable or a string for a class name.
-     * A $middleware may not be necessarily an instance of MDCS\Slim\Middleware.
-     * @param mixed $middleware ... Unlimited number of callable middleware.
+     * A $middleware may not be necessarily an instance of Kod\BootstrapSlim\Middleware.
+     *
+     * @param array ...$middleware
      * @return static
+     * @throws \InvalidArgumentException
      */
     public function addMiddleware(...$middleware)
     {
-        for ($i = 0; $i < count($middleware); $i++) {
-            if (is_callable($middleware[$i])) {
-                $this->app->add($middleware[$i]);
-            } else {
-                $class = $middleware[$i];
-                $callable = new $class($this->getAppContainer());
+        foreach ($middleware as $mw) {
+            if (is_callable($mw)) {
+                $this->app->add($mw);
+            } else if (is_string($mw)) {
+                $class = $mw;
+                $callable = new $class($this->getContainer());
                 $this->app->add($callable);
+            } else {
+                throw new \InvalidArgumentException('Unsupported type for the middleware');
             }
         }
 
@@ -78,19 +81,21 @@ class Bootstrap
     /**
      * Add application route(s).
      * The only requirement: $routes can be a callable or a string for a class name.
-     * A $routes parameter may not be necessarily an instance of MDCS\Slim\Routes.
+     * A $routes parameter may not be necessarily an instance of Kod\BootstrapSlim\RouteDefinitions.
      * @param $routes ...    Unlimited number of routes definitions.
      * @return static
+     * @throws \InvalidArgumentException
      */
-    public function addRoutes(...$routes)
+    public function addRouteDefinitions(...$routes)
     {
-        for ($i = 0; $i < count($routes); $i++) {
-            if (is_callable($routes[$i])) {
-                $routes[$i]($this->app);
-            } else {
-                $class = $routes[$i];
-                $callable = new $class();
+        foreach ($routes as $route) {
+            if (is_callable($route)) {
+                $route($this->app);
+            } else if (is_string($route)) {
+                $callable = new $route();
                 $callable($this->app);
+            } else {
+                throw new \InvalidArgumentException('Unsupported type for the route');
             }
         }
 
@@ -110,16 +115,32 @@ class Bootstrap
      * Get Slim container with app settings.
      * @return ContainerInterface
      */
-    public function getAppContainer(): ContainerInterface
+    public function getContainer(): ContainerInterface
     {
         return $this->app->getContainer();
     }
 
     /**
-     * Execute Slim app.
+     * Wrapper for Slim Ap::run() mrthod
      */
-    public function run()
+    /**
+     * @param bool $silent
+     * @return ResponseInterface
+     */
+    public function run(bool $silent = false)
     {
-        $this->app->run();
+        return $this->app->run($silent);
+    }
+
+    /**
+     * Shortcut for the URL generation of the named route
+     * with the Slim application router’s pathFor() method
+     * @param string $name
+     * @param array $args
+     * @return string
+     */
+    public function getPathFor(string $name, array $args): string
+    {
+        return $this->app->getContainer()->get('router')->pathFor($name, $args);
     }
 }

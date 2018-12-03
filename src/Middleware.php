@@ -1,14 +1,12 @@
 <?php
 /**
- * Copyright (C)  2018 Orange
+ * Copyright (c) 2018 Konstantin Deryabin
  *
- * This software is confidential and proprietary information of Orange.
- * You shall not disclose such Confidential Information and shall use it only
- * in accordance with the terms of the agreement you entered into.
- * Unauthorized copying of this file, via any medium is strictly prohibited.
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
  */
 
-namespace MDCS\Slim;
+namespace Kod\BootstrapSlim;
 
 use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -39,5 +37,9 @@ abstract class Middleware
      *
      * @return ResponseInterface
      */
-    abstract public function __invoke($request, $response, $next);
+    abstract public function __invoke(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        $next
+    );
 }
