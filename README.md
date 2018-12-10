@@ -69,8 +69,6 @@ $bootstrap = (new Bootstrap(App::class, $config))
         }
     );
 ```
- 
-
 
 ## What's in the library
 
