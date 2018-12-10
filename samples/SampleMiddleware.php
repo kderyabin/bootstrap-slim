@@ -6,7 +6,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Kod\BootstrapSlim\Tests\Mocks;
+namespace Kod\BootstrapSlim\Sample;
 
 use Kod\BootstrapSlim\Middleware;
 use Slim\Http\Request;
@@ -15,10 +15,10 @@ use Slim\Http\Response;
 /**
  * MiddlewareMock writes some content before and after content generation.
  */
-class MockMiddleware extends Middleware
+class SampleMiddleware extends Middleware
 {
-    public static $contentBefore = 'BEFORE';
-    public static $contentAfter = 'AFTER';
+    public static $contentBefore = '>>>app middleware';
+    public static $contentAfter = '<<<app middleware';
     /**
      * @param Request $request
      * @param Response $response
@@ -27,9 +27,12 @@ class MockMiddleware extends Middleware
      */
     public function __invoke($request, $response, $next)
     {
-        $response->getBody()->write(MockMiddleware::$contentBefore);
+        $response->getBody()->write(static::$contentBefore);
         $response = $next($request, $response);
-        $response->getBody()->write(MockMiddleware::$contentAfter);
+        /**
+         * @var Response $response
+         */
+        $response->getBody()->write(static::$contentAfter);
 
         return $response;
     }

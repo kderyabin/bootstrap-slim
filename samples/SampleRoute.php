@@ -6,7 +6,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Kod\BootstrapSlim\Tests\Mocks;
+namespace Kod\BootstrapSlim\Sample;
 
 use Kod\BootstrapSlim\RouteDefinitions;
 use Slim\App;
@@ -14,18 +14,18 @@ use Slim\Http\Request;
 use Slim\Http\Response;
 
 /**
- * MockRouteDefinitions sets the route and content generation.
+ * SampleRoute sets the route and content generation.
  */
-class MockRouteDefinitions extends RouteDefinitions
+class SampleRoute extends RouteDefinitions
 {
-    public static $content = ' BODY ';
+    public static $content = ' SampleRoute ';
     /**
      * @param App $app
      */
     public function __invoke($app)
     {
         $app->get('/', function (Request $request, Response $response) {
-            $response->getBody()->write(MockRouteDefinitions::$content);
+            $response->getBody()->write(SampleRoute::$content);
 
             return $response;
         });

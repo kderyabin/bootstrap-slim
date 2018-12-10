@@ -36,6 +36,15 @@ class Bootstrap
      * Override this method and declare your middlewares here.
      * The middleware definition order is important.
      * @return static
+     * @example
+     * public function addAppMiddleware()
+     * {
+     *      $this->addMiddleware(
+     *          MyMiddleware::class,
+     *          MyAnotherMiddleware::class
+     *      );
+     *      return $this;
+     * }
      */
     public function addAppMiddleware()
     {
@@ -46,8 +55,37 @@ class Bootstrap
      * Attach application routes.
      * Override this method and declare your route(s) here.
      * @return static
+     * @example
+     * public function addAppRoutes()
+     * {
+     *      $this->addRouteDefinitions(
+     *          MyRoute::class,
+     *          MyAnotherRoute::class
+     *      );
+     *      return $this;
+     * }
      */
     public function addAppRoutes()
+    {
+        return $this;
+    }
+
+    /**
+     * Inject application dependencies.
+     * Override this method and declare your DI here.
+     * @return static
+     * @example
+     * public function addAppDependencies()
+     * {
+     *      $container = $this->getContainer();
+     *      // for pimple based container
+     *      $container['session'] = $container->factory(function ($c) {
+     *          return new Session($c['session_storage']);
+     *      });
+     *      return $this;
+     * }
+     */
+    public function addAppDependencies()
     {
         return $this;
     }
@@ -66,7 +104,7 @@ class Bootstrap
         foreach ($middleware as $mw) {
             if (is_callable($mw)) {
                 $this->app->add($mw);
-            } else if (is_string($mw)) {
+            } elseif (is_string($mw)) {
                 $class = $mw;
                 $callable = new $class($this->getContainer());
                 $this->app->add($callable);
@@ -91,7 +129,7 @@ class Bootstrap
         foreach ($routes as $route) {
             if (is_callable($route)) {
                 $route($this->app);
-            } else if (is_string($route)) {
+            } elseif (is_string($route)) {
                 $callable = new $route();
                 $callable($this->app);
             } else {

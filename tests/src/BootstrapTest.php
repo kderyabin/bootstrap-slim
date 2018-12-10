@@ -9,9 +9,11 @@
 namespace Kod\BootstrapSlim\Tests;
 
 use Kod\BootstrapSlim\Bootstrap;
-use Kod\BootstrapSlim\Tests\Mocks\MockBootstrap;
-use Kod\BootstrapSlim\Tests\Mocks\MockMiddleware;
-use Kod\BootstrapSlim\Tests\Mocks\MockRouteDefinitions;
+use Kod\BootstrapSlim\Sample\SampleBootstrap;
+use Kod\BootstrapSlim\Sample\SampleMiddleware;
+use Kod\BootstrapSlim\Sample\SampleMiddleware2;
+use Kod\BootstrapSlim\Sample\SampleRoute;
+use Kod\BootstrapSlim\Sample\SampleRoute2;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -23,7 +25,8 @@ use Slim\Http\Response;
 class BootstrapTest extends TestCase
 {
     /**
-     * Test base class
+     * @testdox  Test fluid pattern
+     *
      */
     public function testConstruction()
     {
@@ -32,34 +35,30 @@ class BootstrapTest extends TestCase
         $this->assertInstanceOf(ContainerInterface::class, $bootstrap->getContainer());
         $this->assertInstanceOf(Bootstrap::class, $bootstrap->addAppRoutes());
         $this->assertInstanceOf(Bootstrap::class, $bootstrap->addAppMiddleware());
+        $this->assertInstanceOf(Bootstrap::class, $bootstrap->addAppDependencies());
     }
 
     /**
-     * Test customized Bootstrap class with default RouteDefinitions and Middleware set up.
-     * @throws \Exception
-     * @throws \Slim\Exception\MethodNotAllowedException
-     * @throws \Slim\Exception\NotFoundException
+     * @testdox Test customized Bootstrap class with application RouteDefinitions and Middleware
      */
     public function testInitialisation()
     {
-        $bootstrap = new MockBootstrap(App::class);
+        // initialize with empty settings
+        $bootstrap = new SampleBootstrap(App::class);
         $bootstrap->addAppMiddleware()->addAppRoutes();
-        /**
-         * @var App $app
-         */
-        $app = $bootstrap->getApp();
-        $request = static::getRequest(static::getEnv([
+        // prepare the request
+        $container = $bootstrap->getContainer();
+        $container['environment'] = Environment::mock([
             'REQUEST_METHOD' => 'GET',
             'REQUEST_URI' => '/',
-        ]));
-        $response = $app->process($request, new Response());
-
+        ]);
+        // run the app
+        $response = $bootstrap->run(true);
         $content = (string)$response->getBody();
 
-        $this->assertContains(MockMiddleware::$contentBefore, $content);
-        $this->assertContains(MockMiddleware::$contentAfter, $content);
-
-        $this->assertContains(MockRouteDefinitions::$content, $content);
+        $this->assertContains(SampleMiddleware::$contentBefore, $content);
+        $this->assertContains(SampleMiddleware::$contentAfter, $content);
+        $this->assertContains(SampleRoute::$content, $content);
     }
 
     /**
@@ -68,16 +67,16 @@ class BootstrapTest extends TestCase
     public function testInitWithCallables()
     {
         $ci = [
-            'environment' => static::getEnv([
+            'environment' => Environment::mock([
                 'REQUEST_METHOD' => 'GET',
                 'REQUEST_URI' => '/',
             ]),
         ];
 
-        $bootstrap = new MockBootstrap(App::class, $ci);
+        $bootstrap = new Bootstrap(App::class, $ci);
         $bootstrap
             ->addMiddleware(
-                new MockMiddleware($bootstrap->getContainer()),
+                new SampleMiddleware($bootstrap->getContainer()),
                 function ($request, $response, $next) {
                     $response->getBody()->write('*START*');
                     $response = $next($request, $response);
@@ -87,18 +86,18 @@ class BootstrapTest extends TestCase
                 }
             )
             ->addRouteDefinitions(
-                new MockRouteDefinitions()
+                new SampleRoute()
             );
 
         $response = $bootstrap->run(true);
         $content = (string)$response->getBody();
 
-        $this->assertContains(MockMiddleware::$contentBefore, $content);
-        $this->assertContains(MockMiddleware::$contentAfter, $content);
+        $this->assertContains(SampleMiddleware::$contentBefore, $content);
+        $this->assertContains(SampleMiddleware::$contentAfter, $content);
         $this->assertContains('*START*', $content);
         $this->assertContains('*END*', $content);
 
-        $this->assertContains(MockRouteDefinitions::$content, $content);
+        $this->assertContains(SampleRoute::$content, $content);
     }
 
     /**
@@ -107,9 +106,9 @@ class BootstrapTest extends TestCase
     public function testAddMiddlewareBadType()
     {
         $this->expectException(\InvalidArgumentException::class);
-        $bootstrap = new MockBootstrap(App::class);
+        $bootstrap = new Bootstrap(App::class);
 
-        $bootstrap->addMiddleware( []);
+        $bootstrap->addMiddleware([]);
     }
 
     /**
@@ -118,42 +117,116 @@ class BootstrapTest extends TestCase
     public function testAddRouteBadType()
     {
         $this->expectException(\InvalidArgumentException::class);
-        $bootstrap = new MockBootstrap(App::class);
+        $bootstrap = new Bootstrap(App::class);
 
-        $bootstrap->addRouteDefinitions( []);
+        $bootstrap->addRouteDefinitions([]);
     }
 
     /**
-     * @testdox Should return return a route's URI
+     * @testdox Should return a route's URI
      */
     public function testRouteUriGeneration()
     {
-        $bootstrap = new MockBootstrap(App::class, []);
-        $bootstrap->addRouteDefinitions(  function($app) {
+        $bootstrap = new Bootstrap(App::class, []);
+        $bootstrap->addRouteDefinitions(function ($app) {
             $app->get('/hello/{name}', function ($request, $response, $args) {
                 // Show book identified by $args['id']
             })->setName('hello');
-            }
+        }
         );
-        $uri = $bootstrap->getPathFor('hello', [ 'name' => 'John']);
+        $uri = $bootstrap->getPathFor('hello', ['name' => 'John']);
         $this->assertEquals('/hello/John', $uri);
     }
 
     /**
-     * @param Environment $env
-     * @return ServerRequestInterface
+     * @testdox Should execute a route's middleware and app middleware
      */
-    protected static function getRequest( Environment $env ): ServerRequestInterface
+    public function testRouteMiddleware()
     {
-        return Request::createFromEnvironment($env);
+        // prepare the request
+        $conf = [
+            'environment' => Environment::mock([
+                'REQUEST_METHOD' => 'GET',
+                'REQUEST_URI' => '/route2',
+            ]),
+        ];
+        // initialize the app
+        $bootstrap = new SampleBootstrap(App::class, $conf);
+        $bootstrap->addAppMiddleware()->addAppRoutes();
+        /**
+         * @var Response $response
+         */
+        $response = $bootstrap->run(true);
+        $content = (string)$response->getBody();
+        // test the route's middleware output
+        $this->assertContains(SampleMiddleware2::$contentBefore, $content);
+        $this->assertContains(SampleMiddleware2::$contentAfter, $content);
+        // test the app middleware output
+        $this->assertContains(SampleMiddleware::$contentBefore, $content);
+        $this->assertContains(SampleMiddleware::$contentAfter, $content);
+        // test the content
+        $this->assertContains(SampleRoute2::$content, $content);
+    }
+
+    public function testDependencyInjection()
+    {
+        $bootstrap = new SampleBootstrap(App::class, []);
+        $bootstrap
+            ->addAppDependencies()
+            ->addRouteDefinitions(function ($app) {
+                $app->get('/', function (Request $request, Response $response) {
+                    /**
+                     * @var ContainerInterface $this
+                     */
+                    $formatName = $this->get('person');
+                    return $response->write($formatName('John Doe'));
+                });
+            });
+        $env = [
+            'REQUEST_METHOD' => 'GET',
+            'REQUEST_URI' => '/',
+        ];
+        $request = static::getRequest($env);
+        $response = $bootstrap->getApp()->process($request, new Response());
+        $content =(string)$response->getBody();
+        $this->assertEquals('Person name: John Doe', $content);
+    }
+
+
+    public function testPostFormData()
+    {
+        $bootstrap = new Bootstrap(App::class, []);
+        $bootstrap
+            ->addRouteDefinitions(function ($app) {
+                $app->post('/', function (Request $request, Response $response) {
+                    return $response->write(
+                        print_r($request->getParsedBody(), true)
+                    );
+                });
+            });
+        $env = [
+            'REQUEST_METHOD' => 'POST',
+            'REQUEST_URI' => '/',
+        ];
+        $request = (static::getRequest($env))
+            ->withParsedBody([
+                'name' => 'John',
+                'surname' => 'Doe'
+            ]);
+        $response = $bootstrap->getApp()->process($request, new Response());
+        $content =(string)$response->getBody();
+        $this->assertContains('John', $content);
+        $this->assertContains('Doe', $content);
     }
 
     /**
-     * @param array $data
-     * @return Environment
+     * @param array $env
+     * @return ServerRequestInterface
      */
-    protected static function getEnv( array $data): Environment
+    protected static function getRequest(array $env): ServerRequestInterface
     {
-        return Environment::mock($data);
+        return Request::createFromEnvironment(
+            Environment::mock($env)
+        );
     }
 }

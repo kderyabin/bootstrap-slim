@@ -28,7 +28,7 @@
   "autoload-dev": {
     "psr-4": {
       "Kod\\BootstrapSlim\\Tests\\": "tests/src",
-      "Kod\\BootstrapSlim\\Tests\\Mocks\\": "tests/Mocks"
+      "Kod\\BootstrapSlim\\Sample\\": "samples"
     }
   },
   "require": {
@@ -37,8 +37,8 @@
   },
   "require-dev": {
     "squizlabs/php_codesniffer": "~3.3.0",
-    "phpunit/phpunit": "~7.4.0",
-    "slim/slim": "~3.9.0"
+    "phpunit/phpunit": "^7.4",
+    "slim/slim": "^3.9"
   },
   "scripts": {
     "test": [
@@ -46,10 +46,10 @@
       "@tu"
     ],
     "cs": [
-      "env ./bin/phpcs --colors --encoding=utf-8 --standard=ruleset.xml --runtime-set ignore_warnings_on_exit 1  ./src"
+      "env ./bin/phpcs --colors --standard=PSR2  ./src ./samples"
     ],
     "cs-fix": [
-      "env ./bin/phpcbf --encoding=utf-8 --standard=ruleset.xml  -n --runtime-set ignore_warnings_on_exit 1 --ignore=src/lib/vendor/ src"
+      "env ./bin/phpcbf --standard=PSR2 --ignore=src/lib/vendor/ ./src ./samples"
     ],
     "tu": [
       "env ./bin/phpunit --testdox  -v -c tests/phpunit.xml"
