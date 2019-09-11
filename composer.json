@@ -1,12 +1,11 @@
 {
   "name": "kod/bootstrap-slim",
-  "description": "Library for bootstrapping a Slim 4 based application.",
-  "version": "1.0.0",
+  "description": "Library for bootstrapping a Slim based application.",
   "type": "library",
   "license": "MIT",
   "keywords": [
     "php",
-    "Slim 3",
+    "Slim framework 4",
     "bootstrap"
   ],
   "authors": [
