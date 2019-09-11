@@ -1,288 +1,335 @@
-# Bootstrap SLIM  3
+# Bootstrap SLIM  
 
-This repository holds a library for bootstrapping SLIM 3 application. 
-
-Have a look on the [Slim 3 skeleton](https://github.com/kderyabin/slim-skeleton) built on top of 
-this package for ready to use implementation.
-
-See also [sample classes](./samples)
+This package provides a library for bootstrapping Slim framework 4 application.
+(Release 1 is for Slim 3) 
 
 ## Purpose
 
 - Centralize the application's initialisation
 - Reuse existing configuration in unit tests
-- Create on the fly a new customized configuration, middleware or routes for unit tests
-- Reduce usage of `require`/`include` statements.
-
-## Introduction
-
-This package allows you to play with different parts of your application assembling them all together according to your needs.
-
-For instance, let's say you want just to test your newly created route (NewRoute) without all the application middleware 
-stack controlling the input and output and all settings. You can bootstrap your app like this:
-```php
-$config = [ 
-    'settings' => [
-        'test_param' => 'test_value',
-    ] 
-];
-$bootstrap = (new Bootstrap(App::class, $config))
-    ->addRouteDefinitions(
-        NewRoute::class
-    );
-```
-Now the same route but with application's middleware :
-```php
-$bootstrap = (new Bootstrap(App::class, $config))
-    ->addAppMiddleware()
-    ->addRouteDefinitions(
-        NewRoute::class
-    );
-```
-And if you want a complete workflow:
-
-```php
-$config = require '/path/to/app/config.php';
-$bootstrap = (new Bootstrap(App::class, $config))
-    ->addAppDependencies()
-    ->addAppRoutes()
-    ->addAppMiddleware()
-```
-You can go even further by declaring routes and/or middleware on the fly which is quite useful for 
-test driven development.
-```php
-$bootstrap = (new Bootstrap(App::class, $config))
-    ->addMiddleware(
-          function ($request, $response, $next) {
-              $response->getBody()->write('*START*');
-              $response = $next($request, $response);
-              $response->getBody()->write('*END*');
-    
-              return $response;
-          }
-    )
-    ->addRouteDefinitions(
-        function ($app) {
-            $app->get('/hello/{name}', function ($request, $response, $args) {
-                return $response;
-            })->setName('hello');
-        }
-    );
-```
-
-## What's in the library
-
-| File | Description  |
-|:---|:--- |
-|`Middleware.php` | Abstract class for middleware declaration.|
-|`RouteDefintions.php` | Abstract class for routs(s) declaration| 
-|`Bootstrap.php` | Main class where application routes and middleware stack are declared| 
+- Create on the fly new customized configuration for unit tests
+- Reduce usage of `require`/`include` statements in favour of `use` statement 
 
 
 ## Installation
 
-Add this package to `require` section of your `composer.json`
+Add this package to `require` section of the `composer.json`
+
 ```
 composer require kod/bootstrap-slim
 ```
-## Usage
 
-### Bootstrap
 
-Create a Bootstrap class by extending `Kod\BootstrapSlim\Bootstrap` class and instantiate it in public `index.php` to run the application like this:
+
+## Implementation in 3 steps
+
+
+### Bootstrap  - step 1
+
+On `index.php` for handling public requests.
 ```php
 <?php
-use Slim\App;
 use MyProject\Bootstrap;
 
 // application configuration
-$conf = require('config.php');
-// Instantiate and run
- (new Bootstrap(App::class,  $conf))
-        ->addAppDependencies()
+$config = require('config.php');
+
+ (new Bootstrap($config))
         ->addAppRoutes()
-        ->addAppMiddleware()
+        ->addAppMiddlewares()
         ->run();
- 
 ```
-For now it does not do that much and is not able to process requests. You need to:
-* Create routes and declare them in `Bootstrap::addAppRoutes()` method
-* Create middleware classes and declare them in `Bootstrap::addAppMiddleware()` method
-* [optionnal] Declare your dependencies in `Bootstrap::addAppDependencies()` method if you want to use some 
-advanced features offered by Slim Container like using `factory()` or `protect()` methods etc...
 
-### Middleware
+Of course, `Bootstrap` class does not provide any route or middleware except native Slim RoutingMiddleware and ErrorMiddleware.
+You need to extend it and declare your routes in `Bootstrap::addAppRoutes()` and middleware stack in 
+`Bootstrap::addAppMiddlewares()` methods. It can be done easily by declaring class names like in example below.
 
-Create a middleware class  by extending  `Kod\BootstrapSlim\Middleware` abstract class 
-and implement your business logic in `__invoke($request, $response, $next)` method. 
-Protected class property `$ci` contains a reference to the application dependency container. 
-You can fetch services from the container like this: 
-
+### Declare application routes and middleware stack
 
 ```php
+<?php
+namespace MyProject;
+
+use Kod\BootstrapSlim\Bootstrap as SlimBootstrap;
+
+class Bootstrap extends SlimBootstrap 
+{
+    public function addAppRoutes()
+    {
+        return $this->addRouteDefinitions(
+            HomeRoutes::class,
+            HelpRoutes::class
+        );
+    }
+    public function addAppMiddleware()
+    {
+        return $this->addMiddleware(
+            ValidateResponse::class,
+            SecurityHeaders::class,
+            ValidateRequest::class
+        );
+    }
+}
+```
+
+None of those classes exists yet. So, let's start with the most important. Let's create our route. 
+
+### Routing - step 2
+
+You have 2 options for creating routes. If you are a fun of OOP you can create a class containing your routes by 
+extending `RouteDefintions` abstract class and declare your routes in `__invoke($app)` method of this class. As 
+said above, you can but you are not obliged to. The MUST is to implement the `__invoke($app)` method in your class which 
+receives `Slim\App` instance as a parameter. The instance of the class is executed like a function. 
+
+And here comes the 2nd option. You can declare your routes as Closure which gets `Slim\App` instance as a parameter. The 2nd approach is quite 
+useful for unit tests if you need to create a route on the fly. But what am I saying? I'm getting obsolete. With php we can 
+create anonymous classes! ¡Ay, caramba!
+
+Anyway, just keep in mind that in both cases the `Slim\App` instance is passed as a parameter. That means you can 
+organize your routes in groups and attach middleware to some route or group.
+
+#### Route as a class: 
+```php
+<?php
+
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Kod\BootstrapSlim\RouteDefinitions;
+
+class HomesRoutes extends RouteDefinitions
+{
+    public function __invoke($app)
+    {
+        $app->get('/', function (Request $request, Response $response, $args) {
+            $response->getBody()->write('home page');
+
+            return $response;
+        });
+    }
+}
+```
+
+#### Application routes' declaration as a Closure
+```php
+<?php
+namespace MyProject;
+
+use Kod\BootstrapSlim\Bootstrap as SlimBootstrap;
+use Slim\App;
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use MyProject\Routes\HomesRoutes;
+
+class Bootstrap extends SlimBootstrap 
+{
+    public function addAppRoutes()
+    {
+        return $this->addRouteDefinitions(
+            HomesRoutes::class,
+            function(App $app){
+               $app->get('/', function (Request $request, Response $response, $args) {
+                   return $response;
+               });
+            }
+        );
+    }
+}
+```
+
+### Middleware - step 3
+
+You can create a middleware in 2 ways: as a class or a closure. To create it as a class simply extend 
+invokable `Middleware` abstract class, implement your business logic in it and trigger its execution in 
+`Middleware::__invoke( ServerRequestInterface $request,RequestHandlerInterface $handler)` method. 
+
+Slim 4 middleware implements PSR-15 Middleware Interface which means that you do not have to use `Middleware` abstract 
+class but write your own implementing the PSR-15 Middleware Interface. That'll do the job as well. 
+
+Either way, the application container will be pushed into the constructor of the middleware class by 
+`Slim\MiddlewareDispatcher`.In `Middleware` derived classes the container will be stocked in `$this->ci` property.
+
+To create a middleware as a closure simply respect the function signature.
+
+#### Middleware as invokable class
+```php
+<?php
+
+use Kod\BootstrapSlim\Middleware;
+use Psr\Http\{
+    Message\ResponseInterface,
+    Message\ServerRequestInterface,
+};
+use Psr\Http\Server\RequestHandlerInterface;
+
+/**
+ * MiddlewareMock writes some content before and after content generation.
+ */
 class MyMiddleware extends Middleware
 {
     /**
-     * @param Request $request
-     * @param Response $response
-     * @param callable $next
-     * @return Response
+     * @param ServerRequestInterface $request
+     * @param RequestHandlerInterface $handler
+     * @return ResponseInterface
      */
-    public function __invoke($request, $response, $next)
+    public function __invoke(ServerRequestInterface  $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        // get logger service
-        $logger = $this->ci->get('logger');
-        $logger->info('Middleware start');
-        $response->getBody()->write('>>> before');
-        $response = $next($request, $response);
-        /**
-         * @var Response $response
-         */
-        $response->getBody()->write('<<< after');
-
+        $container = $this->ci; // absolutely useless, just for the demo
+        $response = $handler->handle($request);
+        ... // some treatment here
         return $response;
     }
 }
 ```
 
-Next step is to declare it in `Bootstrap:addAppMiddleware` method so it 
-can be injected into the slim application when called from public index.php page.
-Use following syntax :
-```php   
-public function addAppMiddleware()
-{
-    return $this->addMiddleware(
-        ValidateResponse::class,
-        MyRoute::class,
-        ValidateRequest::class
-    );
-}
-
-```
-
-### Routes
-
-Create a class containing your route declaration by extending `Kod\BootstrapSlim\RouteDefintions` abstract class.
- Define your route in `__invoke($app)` method like in example below. This method receives an instance of 
- the Slim\App class. You may declare all application's routes in one class or have a distinct class per route. 
- To find more on route's declaration see [Slim Router docs](https://www.slimframework.com/docs/v3/objects/router.html).
+#### Application middleware declaration
 ```php
-class MyRoute extends RouteDefinitions
+<?php
+namespace MyProject;
+
+use Kod\BootstrapSlim\Bootstrap as SlimBootstrap;
+use Psr\Http\{
+    Message\ResponseInterface,
+    Message\ServerRequestInterface,
+};
+use Psr\Http\Server\RequestHandlerInterface;
+use MyProject\Middleware\MyMiddleware;
+
+class Bootstrap extends SlimBootstrap 
 {
-    /**
-     * @param App $app  Slim App class instance
-     */
-    public function __invoke($app)
+    public function addAppMiddleware()
     {
-        // defined as a closure  with a middleware
-        $app->get('/', function ($request, $response) {
-            $response->getBody()->write('Some content to display');
-            
-            return $response;
-        })->add(new MyRouteMiddleware($app->getContainer()));
-        
-        // define as a class
-        $app->get( '/mvc', MyController::class . ':index');
-        
-        // define a route
-        $app->get( '/test', MyController::class . ':index')
-        $app->get( '/test', MyController::class . ':index')
+        return $this->addMiddleware(
+            MyMiddleware::class,
+            function (ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface {
+                $container = $this; //bound by Slim\MiddlewareDispatcher
+                $response = $handler->handle($request);
+                ... // some treatment here
+                return $response;
+           }
+        );
     }
 }
 ```
-Now add this route to `Bootstrap::addAppRoutes` method. 
+
+#### Route/Group middleware
+
+Slim allows to attach a middleware to a route or a group of routes. This can be done in routes' definition like in 
+example below. 
 
 ```php
-public function addAppRoutes()
+<?php
+
+use Kod\BootstrapSlim\RouteDefinitions;
+use Slim\Psr7\{Request, Response};
+use Slim\Interfaces\RouteCollectorProxyInterface;
+use MyProject\Middleware\MyMiddleware;
+
+class BillingRoutes extends RouteDefinitions
 {
-    return $this->addRouteDefinitions(
-        MyRoute::class,
-        SomeOtherRoute::class
-    );
-}
-```
-### Dependency injection
+    /**
+     * @param App $app
+     */
+    public function __invoke($app)
+    {
+        $app->group('/billing', function (RouteCollectorProxyInterface $group) {
+            $group->get('/', function (Request $request, $response, $args) {
+                // Route for /billing
+                ... // some treatment
+                return $response;
+            });
 
-This is optional. Normally your dependencies are declared as an array in configuration file 
-and injected into the Container by `Slim\App`. But if you want to use some advanced features 
-offered by the Slim Container like using `factory()` or `protect()` methods you can do it 
-in your `Bootstrap::addAppDependencie()` method like this:
+            $group->get('/invoice/{id:[0-9]+}', function (Request $request, Response $response, $args) {
+                // Route for /invoice/{id:[0-9]+}
+                ... // some treatment
+                return $response;
+            });
+        })->add(MyMiddleware::class);
+    }
+}
+
+```
+
+
+## Container
+
+Slim 4 has a breaking change. It does not have container anymore. But no worry! This package provides an implementation of
+`ContainerInterface` built on top of `Pimple\Container` with same methods as in Slim 3. If your application relies on some other 
+container implementation simply provide the instance of your container to Bootstrap. Another way to customize the container
+is to override `Bootstrap::init` method in your Bootstrap class and declare it in there.
 
 ```php
-public function addAppDependencies()
+<?php
+use MyProject\Bootstrap;
+use MyProject\MyContainer;
+
+// application configuration
+$config = require('config.php');
+$container = new MyContainer($config);
+
+(new Bootstrap($container))
+        ->addAppRoutes()
+        ->addAppMiddlewares()
+        ->run();
+
+``` 
+
+## Unit Testing
+
+The keyword in unit testing is UNIT. Once your application is well organized and weakly coupled unit testing is like 
+playing LEGO with your code. You can assemble routes and middleware, declare them on the fly as you wish.
+
+```php
+<?php
+
+use MyProject\{MyBootstrap, MyRoute};
+use Kod\BootstrapSlim\Utils;
+
+class MyRouteTest extends TestCase
 {
-   $container = $this->getContainer();
-   // for pimple based container
-   $container['myclass'] = $container->factory(function ($c) {
-       return new MyClass($c['myclass_config']);
-   });
-   return $this;
+    // test configuration
+    public static $config = [ 'settings' => ['price' => 100] ];
+
+    public function testMyRouteWithoutAppMiddleware()
+    {
+        // Prepare environment for the request
+         Utils::setEnv([
+            'REQUEST_METHOD' => 'GET',
+            'REQUEST_URI' => '/',
+         ]);
+        // Process the request
+        $response = (new MyBootstrap(static::$config))
+            ->addRouteDefinitions(MyRoute::class)
+            ->run(true);
+       
+        $content = (string)$response->getBody();
+        // MyRoute class is supposed to return the price from settings  
+        $this->assertContains(100, $content);
+    }
+    
+    public function testMyRouteWithAppMiddleware()
+    {
+        // Prepare environment for the request
+         Utils::setEnv([
+            'REQUEST_METHOD' => 'GET',
+            'REQUEST_URI' => '/',
+         ]);
+        // Process the request
+        $response = (new MyBootstrap(static::$config))
+            ->addAppMiddleware() // <- declare application middleware
+            ->addRouteDefinitions(MyRoute::class)
+            ->run(true);
+       
+        $content = (string)$response->getBody();
+        // MyRoute class is supposed to return the price from settings  
+        $this->assertContains(100, $content);
+    }
+
 }
+
 ```
 
-That's it. 
+## Slim dependency
 
-## Unit Tests
-
-Some useful tips for unit testing.
-
-### Forging requests
-
-For `GET` requests and, more generally, for any request without the body and/or uploaded files you 
-need to set up the environment only prior to bootstrapping. 
-The request wil be generated by Slim itself. 
-```php
-$conf = [
-    'environment' => Environment::mock([
-        'REQUEST_METHOD' => 'GET',
-        'REQUEST_URI' => '/',
-    ]),
-];
-// initialize the app
-$bootstrap = new MyBootstrap(App::class, $conf);
-```
-For requests requiring body content like `POST` you need to generate the request along with 
-the environment.
-```php
-$env = Environment::mock([
-   'REQUEST_METHOD' => 'POST',
-   'REQUEST_URI' => '/',
-];
-$request = Request::createFromEnvironment($env);
-// set POST data
-$request = $request->withParsedBody([
-    'field' => 'value'
-]);
-$conf = [
-    'environment' => $env,
-    'request' => $request,
-];
-// initialize the app
-$bootstrap = new MyBootstrap(App::class, $conf);
-```
-
-To execute the request use `Bootstrap::run()` method with `true` parameter.
-```php
-$response = $bootstrap->run(true);
-```
-
-Another approach for processing a request is to use `Slim\App::process()` method (not fully tested). 
-In this case you do not need to inject environment and request into the container. 
-```php
-$env = Environment::mock([
-   'REQUEST_METHOD' => 'POST',
-   'REQUEST_URI' => '/',
-];
-$request = Request::createFromEnvironment($env);
-// set POST data
-$request = $request->withParsedBody([
-    'field' => 'value'
-]);
-
-// initialize the app
-$bootstrap = new MyBootstrap(App::class, $conf);
-...
-$response = $bootstrap->getApp()->process($request, new Response());
-```
-
-
+Slim framework 4 now makes part of project dependencies due to quite sophisticated request/response forgery introduced 
+with the latest version. To get rid of that dependency and rely on the slim version installed on your project you need
+to override `Bootstrap::init` method and use `AppFactory` and `ServerRequestCreatorFactory` coming with your project. 

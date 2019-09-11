@@ -5,11 +5,17 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+declare(strict_types=1);
 
 namespace Kod\BootstrapSlim;
 
 use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Server\MiddlewareInterface;
+use Slim\App;
+use Slim\Factory\{AppFactory, ServerRequestCreatorFactory};
+use Slim\Interfaces\ServerRequestCreatorInterface;
+use InvalidArgumentException;
 
 /**
  * Bootstrap
@@ -17,34 +23,53 @@ use Psr\Http\Message\ResponseInterface;
 class Bootstrap
 {
     /**
-     * @var object Slim App instance.
+     * @var App
      */
     protected $app;
+    /**
+     * @var ServerRequestCreatorInterface
+     */
+    protected $serverRequestCreator;
 
     /**
      * Bootstrap constructor.
-     * @param string $slimClass Fully qualified Slim\App class name.
-     * @param array $slimSettings Slim settings.
+     * @param array|ContainerInterface  array of settings or instance of ContainerInterface
      */
-    public function __construct(string $slimClass, $slimSettings = [])
+    public function __construct($settings = [])
     {
-        $this->app = new $slimClass($slimSettings);
+        $this->init($settings);
     }
 
     /**
-     * Attach application middleware.
-     * Override this method and declare your middlewares here.
+     * Override to implement your app initialisation logic
+     * @param array|ContainerInterface  array of settings or instance of ContainerInterface
+     */
+    public function init($settings = [])
+    {
+        $container = $settings instanceof ContainerInterface ? $settings : new Container($settings);
+        AppFactory::setContainer($container);
+        $this->app = AppFactory::create();
+        $this->app->addRoutingMiddleware();
+        $this->app->addErrorMiddleware(false, true, true);
+        $this->serverRequestCreator = ServerRequestCreatorFactory::create();
+    }
+
+    /**
+     * Declare application middleware stack.
      * The middleware definition order is important.
-     * @return static
+     * Override this method and declare your middleware here.
+     *
+     * @return static   Bootstrap instance
+     *
      * @example
-     * public function addAppMiddleware()
-     * {
-     *      $this->addMiddleware(
-     *          MyMiddleware::class,
-     *          MyAnotherMiddleware::class
-     *      );
-     *      return $this;
-     * }
+     *
+     *  public function addAppMiddleware()
+     *  {
+     *      return $this->addMiddleware(
+     *          FirstMiddleware::class,
+     *          SecondMiddleware::class
+     *      )
+     *   }
      */
     public function addAppMiddleware()
     {
@@ -52,17 +77,17 @@ class Bootstrap
     }
 
     /**
-     * Attach application routes.
+     * Attach application routes
      * Override this method and declare your route(s) here.
-     * @return static
+     * @return static   Bootstrap instance
+     *
      * @example
-     * public function addAppRoutes()
-     * {
-     *      $this->addRouteDefinitions(
-     *          MyRoute::class,
-     *          MyAnotherRoute::class
+     *
+     * public function addAppRoutes(){
+     *      return $this->addRouteDefinitions(
+     *          SomeRoute::class,
+     *          SomeOtherRoute::class
      *      );
-     *      return $this;
      * }
      */
     public function addAppRoutes()
@@ -71,45 +96,41 @@ class Bootstrap
     }
 
     /**
-     * Inject application dependencies.
-     * Override this method and declare your DI here.
-     * @return static
-     * @example
-     * public function addAppDependencies()
-     * {
-     *      $container = $this->getContainer();
-     *      // for pimple based container
-     *      $container['session'] = $container->factory(function ($c) {
-     *          return new Session($c['session_storage']);
-     *      });
-     *      return $this;
-     * }
-     */
-    public function addAppDependencies()
-    {
-        return $this;
-    }
-
-    /**
      * Add application middleware
-     * The only requirement: $middleware can be a callable or a string for a class name.
+     * The only requirement: $middleware must be a callable or a string for a class name.
      * A $middleware may not be necessarily an instance of Kod\BootstrapSlim\Middleware.
      *
      * @param array ...$middleware
      * @return static
-     * @throws \InvalidArgumentException
+     *
+     * @example
+     *
+     * (new Bootstrap())->addMiddleware(
+     *      FirstMiddleware::class,
+     *      SecondMiddleware::class,
+     *      function($request, $handler){
+     *          $response = $handler->process($request);
+     *          ...
+     *          return $response;
+     *      }
+     *  );
      */
     public function addMiddleware(...$middleware)
     {
         foreach ($middleware as $mw) {
             if (is_callable($mw)) {
                 $this->app->add($mw);
-            } elseif (is_string($mw)) {
-                $class = $mw;
-                $callable = new $class($this->getContainer());
-                $this->app->add($callable);
-            } else {
-                throw new \InvalidArgumentException('Unsupported type for the middleware');
+                continue;
+            }
+
+            if ($mw instanceof MiddlewareInterface) {
+                $this->app->addMiddleware($mw);
+                continue;
+            }
+
+            if (is_string($mw)) {
+                $this->app->add($mw);
+                continue;
             }
         }
 
@@ -118,11 +139,23 @@ class Bootstrap
 
     /**
      * Add application route(s).
-     * The only requirement: $routes can be a callable or a string for a class name.
+     * The only requirement: $routes must be a callable or a string for a class name.
      * A $routes parameter may not be necessarily an instance of Kod\BootstrapSlim\RouteDefinitions.
      * @param $routes ...    Unlimited number of routes definitions.
      * @return static
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
+     *
+     * @example
+     *
+     * (new Bootstrap())->addRouteDefinitions(
+     *      SomeRoute::class,
+     *      SomeOtherRoute::class,
+     *      function($app){
+     *          $app->get('/', function($request, $response; $args){
+     *              return new Response();
+     *          )->setName('home');
+     *      }
+     *  );
      */
     public function addRouteDefinitions(...$routes)
     {
@@ -133,7 +166,7 @@ class Bootstrap
                 $callable = new $route();
                 $callable($this->app);
             } else {
-                throw new \InvalidArgumentException('Unsupported type for the route');
+                throw new InvalidArgumentException('Unsupported type for the route');
             }
         }
 
@@ -150,7 +183,7 @@ class Bootstrap
     }
 
     /**
-     * Get Slim container with app settings.
+     * Get application container.
      * @return ContainerInterface
      */
     public function getContainer(): ContainerInterface
@@ -159,26 +192,31 @@ class Bootstrap
     }
 
     /**
-     * Wrapper for Slim Ap::run() mrthod
+     * @param bool $silent FALSE to output the content and emit header, TRUE to return generated response
+     * @return ResponseInterface|null
      */
-    /**
-     * @param bool $silent
-     * @return ResponseInterface
-     */
-    public function run(bool $silent = false)
+    public function run(bool $silent = false): ?ResponseInterface
     {
-        return $this->app->run($silent);
+        if (!$silent) {
+            $this->app->run();
+            return null;
+        }
+
+        $request = $this->serverRequestCreator->createServerRequestFromGlobals();
+
+        return $this->app->handle($request);
     }
 
     /**
-     * Shortcut for the URL generation of the named route
-     * with the Slim application router’s pathFor() method
+     * Shortcut for the named route URL.
+     *
      * @param string $name
-     * @param array $args
+     * @param array $data
+     * @param array $queryParams
      * @return string
      */
-    public function getPathFor(string $name, array $args): string
+    public function getPathFor(string $name, array $data = [], array $queryParams = []): string
     {
-        return $this->app->getContainer()->get('router')->pathFor($name, $args);
+        return $this->app->getRouteCollector()->getRouteParser()->urlFor($name, $data, $queryParams);
     }
 }
